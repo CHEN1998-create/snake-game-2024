@@ -302,37 +302,44 @@
       animation: shake 0.5s ease-in-out;
     }
 
-    .joystick {
+    .dpad {
       display: none;
-      position: relative;
-      width: 128px;
-      height: 128px;
+      grid-template-columns: repeat(3, 64px);
+      grid-template-rows: repeat(3, 64px);
+      gap: 8px;
+      justify-content: center;
       margin: 8px auto 0;
-      border-radius: 50%;
-      background: rgba(0, 229, 255, 0.06);
-      border: 2px solid rgba(0, 229, 255, 0.45);
-      box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
-      touch-action: none;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
     }
 
-    .joystick-stick {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 52px;
-      height: 52px;
-      margin: -26px 0 0 -26px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, rgba(0, 229, 255, 0.9), rgba(0, 229, 255, 0.35));
-      box-shadow: 0 0 14px rgba(0, 229, 255, 0.7);
-      transform: translate(0, 0);
-      pointer-events: none;
+    .dpad-btn {
+      border: 1px solid rgba(0, 229, 255, 0.5);
+      border-radius: 12px;
+      background: rgba(0, 229, 255, 0.08);
+      color: var(--accent);
+      font-size: 26px;
+      font-family: var(--font-mono);
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
     }
+
+    .dpad-btn:active {
+      background: rgba(0, 229, 255, 0.25);
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.6);
+    }
+
+    .dpad-up { grid-column: 2; grid-row: 1; }
+    .dpad-left { grid-column: 1; grid-row: 2; }
+    .dpad-down { grid-column: 2; grid-row: 3; }
+    .dpad-right { grid-column: 3; grid-row: 2; }
 
     @media (pointer: coarse), (max-width: 600px) {
-      .joystick { display: block; }
+      .dpad { display: grid; }
     }
   </style>
 </head>
@@ -398,8 +405,11 @@
       <button class="btn-restart" id="btnRestart">重新开始</button>
     </div>
 
-    <div class="joystick" id="joystick">
-      <div class="joystick-stick" id="joystickStick"></div>
+    <div class="dpad">
+      <button class="dpad-btn dpad-up" data-dir="up" aria-label="上">▲</button>
+      <button class="dpad-btn dpad-left" data-dir="left" aria-label="左">◀</button>
+      <button class="dpad-btn dpad-down" data-dir="down" aria-label="下">▼</button>
+      <button class="dpad-btn dpad-right" data-dir="right" aria-label="右">▶</button>
     </div>
 
     <div class="tips">
@@ -412,8 +422,8 @@
     (function () {
       const COLS = 20;
       const ROWS = 20;
-      const CELL = 20; // canvas 内每格像素
-      const SPEEDS = { easy: 200, normal: 140, hard: 80 }; // 不同难度：毫秒/步
+      const CELL = 20;
+      const SPEEDS = { easy: 200, normal: 140, hard: 80 };
 
       const canvas = document.getElementById('board');
       const ctx = canvas.getContext('2d');
@@ -429,12 +439,11 @@
       const gameEl = document.querySelector('.game');
       const canvasWrap = document.querySelector('.canvas-wrap');
 
-      // 状态: 'ready' | 'running' | 'paused' | 'over'
       let status = 'ready';
       let snake = [];
       let food = { x: 0, y: 0, golden: false };
-      let dir = { x: 1, y: 0 };        // 当前移动方向
-      let dirQueue = [];                // 输入缓冲队列（预存方向指令）
+      let dir = { x: 1, y: 0 };
+      let dirQueue = [];
       let score = 0;
       let timer = null;
       let particles = [];
@@ -450,7 +459,7 @@
       let countdownValue = 0;
       let combo = 0;
       let lastEatTime = 0;
-      let bodySet = new Set();   // 蛇身格子集合（O(1) 碰撞检测）
+      let bodySet = new Set();
 
       function randomInt(max) {
         return Math.floor(Math.random() * max);
@@ -484,7 +493,6 @@
       }
 
       function placeFood() {
-        // 收集空闲格子，并按到蛇头的距离加权（越远权重越大）
         const head = snake[0];
         const occupied = new Set();
         snake.forEach(s => occupied.add(s.x + ',' + s.y));
@@ -585,9 +593,9 @@
         if (speedBoostTimer) clearTimeout(speedBoostTimer);
         speedBoostTimer = setTimeout(() => {
           speedBoostTimer = null;
-          if (status === 'running') startLoop(); // 3 秒后恢复原速
+          if (status === 'running') startLoop();
         }, 3000);
-        if (status === 'running') startLoop(); // 立即加速
+        if (status === 'running') startLoop();
       }
 
       function startLoop() {
@@ -615,15 +623,15 @@
         countdownValue = 3;
         setStatus('countdown');
         stopCountdownTimer();
-        playCountdownSound(); // "3" 的滴声
+        playCountdownSound();
         countdownTimer = setInterval(() => {
           countdownValue -= 1;
           if (countdownValue <= 0) {
             stopCountdownTimer();
             beginRun();
-            playStartSound(); // 归零开始音
+            playStartSound();
           } else {
-            playCountdownSound(); // "2" / "1" 的滴声
+            playCountdownSound();
             updateOverlay();
           }
         }, 1000);
@@ -665,7 +673,6 @@
       }
 
       function tick() {
-        // 从输入缓冲队列取出下一个方向
         if (dirQueue.length) {
           dir = dirQueue.shift();
         }
@@ -673,7 +680,6 @@
         const head = snake[0];
         const newHead = { x: head.x + dir.x, y: head.y + dir.y };
 
-        // 撞墙判定：穿墙模式下从对面穿出
         if (wrapMode) {
           newHead.x = (newHead.x + COLS) % COLS;
           newHead.y = (newHead.y + ROWS) % ROWS;
@@ -681,7 +687,6 @@
           return gameOver();
         }
 
-        // 撞障碍物判定
         if (obstacles.some(o => o.x === newHead.x && o.y === newHead.y)) {
           return gameOver();
         }
@@ -689,8 +694,6 @@
         const ate = (newHead.x === food.x && newHead.y === food.y);
         const headKey = newHead.x + ',' + newHead.y;
 
-        // 撞到自己判定（O(1) 集合查询）：不吃食物时尾部即将移走，
-        // 先临时移除尾部，避免刚转弯时对尾部的误判
         if (!ate) {
           const tail = snake[snake.length - 1];
           bodySet.delete(tail.x + ',' + tail.y);
@@ -699,16 +702,13 @@
           return gameOver();
         }
 
-        // 记录移动前旧头位置与时间，用于平滑插值（头插法，O(1) 内存）
         prevSnake.unshift({ x: head.x, y: head.y });
         lastTickTime = performance.now();
 
-        // 头插法：头部新增
         snake.unshift(newHead);
         bodySet.add(headKey);
 
         if (ate) {
-          // 连击判定：3 秒内连续吃到则 combo 翻倍
           const now = performance.now();
           combo = (now - lastEatTime <= 3000) ? combo + 1 : 1;
           lastEatTime = now;
@@ -721,9 +721,7 @@
           spawnParticles(newHead.x, newHead.y);
           if (combo >= 2) triggerComboFlash();
           placeFood();
-          // 吃到食物：尾部保留（蛇身变长）
         } else {
-          // 未吃到：尾部删除（头插尾删，内存开销小）
           snake.pop();
           prevSnake.pop();
         }
@@ -738,22 +736,19 @@
 
       function draw(now) {
         const t = now || 0;
-        const breath = (Math.sin(t / 240) + 1) / 2; // 0~1 呼吸相位
+        const breath = (Math.sin(t / 240) + 1) / 2;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 星空粒子背景
         updateStars();
         drawStars(t);
 
-        // 障碍物：灰色方块
         obstacles.forEach((o) => {
           ctx.fillStyle = '#6b7280';
           roundRect(o.x * CELL + 2, o.y * CELL + 2, CELL - 4, CELL - 4, 4);
           ctx.fill();
         });
 
-        // 食物：霓虹 + 脉冲呼吸（金色食物为金色）
         const base = CELL - 4;
         const size = base * (0.8 + breath * 0.3);
         const off = (CELL - size) / 2;
@@ -766,7 +761,6 @@
         ctx.fill();
         ctx.restore();
 
-        // 蛇：平滑插值 + 皮肤样式
         const interval = getSpeed();
         let lerp = 1;
         if (lastTickTime && interval > 0) {
@@ -774,7 +768,6 @@
         }
         drawSnake(lerp);
 
-        // 粒子特效
         updateParticles();
         drawParticles();
       }
@@ -872,14 +865,14 @@
       function shakeScreen() {
         if (!gameEl) return;
         gameEl.classList.remove('shake');
-        void gameEl.offsetWidth; // 强制重排，重新触发动画
+        void gameEl.offsetWidth;
         gameEl.classList.add('shake');
       }
 
       function triggerComboFlash() {
         if (!canvasWrap) return;
         canvasWrap.classList.remove('combo-flash');
-        void canvasWrap.offsetWidth; // 强制重排，重新触发动画
+        void canvasWrap.offsetWidth;
         canvasWrap.classList.add('combo-flash');
       }
 
@@ -925,11 +918,11 @@
       }
 
       function playCountdownSound() {
-        playTone('square', 880, 880, 0.08, 0.12); // 倒计时滴声
+        playTone('square', 880, 880, 0.08, 0.12);
       }
 
       function playStartSound() {
-        playTone('square', 440, 1320, 0.2, 0.15); // 开始上扬音
+        playTone('square', 440, 1320, 0.2, 0.15);
       }
 
       function roundRect(x, y, w, h, r) {
@@ -943,14 +936,12 @@
       }
 
       function drawSnake(lerp) {
-        // 计算插值后的像素中心坐标
         const pts = snake.map((seg, i) => {
           const prev = prevSnake[i] || seg;
           const dx = seg.x - prev.x;
           const dy = seg.y - prev.y;
           let px, py;
           if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-            // 穿墙跳变：不插值，直接使用目标位置
             px = seg.x;
             py = seg.y;
           } else {
@@ -961,7 +952,6 @@
         });
 
         if (skin === 'round') {
-          // 圆形连体：圆润连续的线段 + 蛇头圆
           ctx.save();
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
@@ -986,7 +976,6 @@
           ctx.fill();
           ctx.restore();
         } else if (skin === 'pixel') {
-          // 像素风：直角方块，无圆角
           snake.forEach((seg, i) => {
             const s = CELL - 4;
             ctx.save();
@@ -997,7 +986,6 @@
             ctx.restore();
           });
         } else {
-          // 经典方块：圆角方块
           snake.forEach((seg, i) => {
             const s = CELL - 2;
             ctx.save();
@@ -1012,13 +1000,9 @@
       }
 
       function changeDirection(x, y) {
-        // 参考方向：队列末尾（若有），否则当前移动方向
         const last = dirQueue.length ? dirQueue[dirQueue.length - 1] : dir;
-        // 防反向：与参考方向相反则无效（防止蛇头撞到自己）
         if (last.x + x === 0 && last.y + y === 0) return;
-        // 与参考方向相同则无需重复入队
         if (last.x === x && last.y === y) return;
-        // 输入缓冲队列上限 2 个，超出丢弃
         if (dirQueue.length >= 2) return;
         dirQueue.push({ x, y });
       }
@@ -1070,7 +1054,7 @@
       document.querySelectorAll('input[name="difficulty"]').forEach((radio) => {
         radio.addEventListener('change', () => {
           if (status === 'running') {
-            startLoop(); // 运行中切换难度，立即按新速度继续
+            startLoop();
           }
         });
       });
@@ -1085,62 +1069,32 @@
         wrapMode = wrapToggle.checked;
       });
 
-      // 虚拟摇杆（移动端）+ 150ms 防抖
-      const joystick = document.getElementById('joystick');
-      const joystickStick = document.getElementById('joystickStick');
-      let stickActive = false;
+      const dirMap = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
       let lastDirKey = null;
       let lastDirAt = 0;
 
-      function resetStick() {
-        stickActive = false;
-        joystickStick.style.transform = 'translate(0, 0)';
+      if (typeof window !== 'undefined' &&
+          (('ontouchstart' in window) ||
+           (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0))) {
+        const dpad = document.querySelector('.dpad');
+        if (dpad) dpad.style.display = 'grid';
       }
 
-      function handleStickMove(px, py) {
-        const rect = joystick.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        let dx = px - cx;
-        let dy = py - cy;
-        const maxR = joystick.offsetWidth / 2 - 24;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > maxR && dist > 0) {
-          dx = (dx / dist) * maxR;
-          dy = (dy / dist) * maxR;
-        }
-        joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
-
-        // 方向判定（死区 + 主方向）
-        const threshold = 12;
-        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
-        const dir = Math.abs(dx) >= Math.abs(dy)
-          ? (dx > 0 ? [1, 0] : [-1, 0])
-          : (dy > 0 ? [0, 1] : [0, -1]);
-        const key = dir[0] + ',' + dir[1];
-        if (key === lastDirKey) return; // 方向未变，不重复触发
-        const now = performance.now();
-        if (now - lastDirAt < 150) return; // 150ms 防抖
-        lastDirKey = key;
-        lastDirAt = now;
-        changeDirection(dir[0], dir[1]);
-      }
-
-      joystick.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        stickActive = true;
-        try { joystick.setPointerCapture(e.pointerId); } catch (err) {}
-        handleStickMove(e.clientX, e.clientY);
+      document.querySelectorAll('.dpad-btn').forEach((btn) => {
+        btn.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          const d = dirMap[btn.dataset.dir];
+          if (!d) return;
+          const key = d[0] + ',' + d[1];
+          if (key === lastDirKey) return;
+          const now = performance.now();
+          if (now - lastDirAt < 150) return;
+          lastDirKey = key;
+          lastDirAt = now;
+          changeDirection(d[0], d[1]);
+        });
       });
-      joystick.addEventListener('pointermove', (e) => {
-        if (!stickActive) return;
-        e.preventDefault();
-        handleStickMove(e.clientX, e.clientY);
-      });
-      joystick.addEventListener('pointerup', resetStick);
-      joystick.addEventListener('pointercancel', resetStick);
 
-      // 初始化
       initStars();
       resetGame();
       setStatus('ready');
